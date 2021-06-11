@@ -15,6 +15,7 @@ import { exit_and_close } from '../../modules/message';
 import useLocale from '../../hooks/useLocale';
 import AppModalDialogs from './AppModalDialogs';
 import AppLoading from './AppLoading';
+import AppPassLogin from './AppPassLogin';
 import {
   i18n,
   activateLocale,
@@ -83,6 +84,7 @@ export default function App() {
               <AppRouter />
               <AppModalDialogs />
               <AppLoading />
+              <AppPassLogin />
             </ThemeProvider>
           </WebSocketConnection>
         </I18nProvider>

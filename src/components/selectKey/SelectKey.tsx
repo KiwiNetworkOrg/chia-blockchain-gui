@@ -24,6 +24,7 @@ import {
   delete_key,
   get_private_key,
   selectFingerprint,
+  skipKeyringMigration,
   delete_all_keys,
 } from '../../modules/message';
 import { resetMnemonic } from '../../modules/mnemonic';
@@ -43,6 +44,12 @@ export default function SelectKey() {
   );
   const hasFingerprints =
     publicKeyFingerprints && !!publicKeyFingerprints.length;
+  const needsKeyringMigration = useSelector(
+    (state: RootState) => state.keyring_state.needs_migration
+  );
+  const skippedKeyringMigration = useSelector(
+    (state: RootState) => state.keyring_state.migration_skipped
+  );
 
   function handleClick(fingerprint: Fingerprint) {
     dispatch(resetMnemonic());
@@ -54,47 +61,90 @@ export default function SelectKey() {
     dispatch(get_private_key(fingerprint));
   }
 
-  async function handleDeletePrivateKey(fingerprint: Fingerprint) {
-    const deletePrivateKey = await openDialog((
-      <ConfirmDialog
-        title={<Trans>Delete key</Trans>}
-        confirmTitle={<Trans>Delete</Trans>}
-        cancelTitle={<Trans>Back</Trans>}
-        confirmColor="default"
-      >
-        <Trans>
-          Deleting the key will permanently remove the key from your computer,
-          make sure you have backups. Are you sure you want to continue?
-        </Trans>
-      </ConfirmDialog>
-    ));
+  async function handleDeletePrivateKey(e: React.MouseEvent<HTMLButtonElement>, fingerprint: Fingerprint) {
+    const keyringCanBeModified = await handleKeyringMutator(e);
 
-    // @ts-ignore
-    if (deletePrivateKey) {
-      dispatch(delete_key(fingerprint));
+    if (keyringCanBeModified) {
+      const deletePrivateKey = await openDialog((
+        <ConfirmDialog
+          title={<Trans>Delete key</Trans>}
+          confirmTitle={<Trans>Delete</Trans>}
+          cancelTitle={<Trans>Back</Trans>}
+          confirmColor="default"
+        >
+          <Trans>
+            Deleting the key will permanently remove the key from your computer,
+            make sure you have backups. Are you sure you want to continue?
+          </Trans>
+        </ConfirmDialog>
+      ));
+
+      // @ts-ignore
+      if (deletePrivateKey) {
+        dispatch(delete_key(fingerprint));
+      }
     }
   }
 
-  async function handleDeleteAllKeys() {
-    const deleteAllKeys = await openDialog((
+  async function handleDeleteAllKeys(e: React.MouseEvent<HTMLButtonElement>) {
+    const keyringCanBeModified = await handleKeyringMutator(e);
+
+    if (keyringCanBeModified) {
+      const deleteAllKeys = await openDialog((
+        <ConfirmDialog
+          title={<Trans>Delete all keys</Trans>}
+          confirmTitle={<Trans>Delete</Trans>}
+          cancelTitle={<Trans>Back</Trans>}
+          confirmColor="default"
+        >
+          <Trans>
+            Deleting all keys will permanently remove the keys from your
+            computer, make sure you have backups. Are you sure you want to
+            continue?
+          </Trans>
+        </ConfirmDialog>
+      ));
+
+      // @ts-ignore
+      if (deleteAllKeys) {
+        dispatch(delete_all_keys());
+      }
+    }
+  }
+
+  async function promptForKeyringMigration() {
+    const beginMigration = await openDialog((
       <ConfirmDialog
-        title={<Trans>Delete all keys</Trans>}
-        confirmTitle={<Trans>Delete</Trans>}
-        cancelTitle={<Trans>Back</Trans>}
+        title={<Trans>Migration required</Trans>}
+        confirmTitle={<Trans>Migrate</Trans>}
+        cancelTitle={<Trans>Cancel</Trans>}
         confirmColor="default"
       >
         <Trans>
-          Deleting all keys will permanently remove the keys from your
-          computer, make sure you have backups. Are you sure you want to
-          continue?
+          Your keys have not been migrated to a new keyring. You will be unable to create new keys or delete existing keys until migration completes. Would you like to migrate your keys now?
         </Trans>
       </ConfirmDialog>
     ));
 
     // @ts-ignore
-    if (deleteAllKeys) {
-      dispatch(delete_all_keys());
+    if (beginMigration) {
+      dispatch(skipKeyringMigration(false));
     }
+  }
+
+  async function handleKeyringMutator(e: React.MouseEvent<HTMLButtonElement>): Promise<boolean> {
+    // If the keyring requires migration and the user prevoiusly skipped migration, prompt again
+    if (needsKeyringMigration && skippedKeyringMigration) {
+      // Disable default event handling to avoid navigation updates
+      e.preventDefault();
+      e.stopPropagation();
+
+      promptForKeyringMigration();
+
+      return false;
+    }
+
+    return true;
   }
 
   return (
@@ -160,7 +210,7 @@ export default function SelectKey() {
                           <IconButton
                             edge="end"
                             aria-label="delete"
-                            onClick={() => handleDeletePrivateKey(fingerprint)}
+                            onClick={(e) => handleDeletePrivateKey(e, fingerprint)}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -173,6 +223,7 @@ export default function SelectKey() {
             )}
             <Link to="/wallet/add">
               <Button
+                onClick={(e) => handleKeyringMutator(e)}
                 type="submit"
                 variant="contained"
                 color="primary"
@@ -185,7 +236,12 @@ export default function SelectKey() {
               </Button>
             </Link>
             <Link to="/wallet/import">
-              <Button type="submit" variant="contained" size="large" fullWidth>
+              <Button
+                onClick={(e) => handleKeyringMutator(e)}
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth>
                 <Trans>
                   Import from Mnemonics (24 words)
                 </Trans>

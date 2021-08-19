@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { openDialog } from '../../../../modules/dialog';
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText } from '@material-ui/core';
 
 type Props = {

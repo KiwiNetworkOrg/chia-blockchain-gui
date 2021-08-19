@@ -112,6 +112,8 @@ export default {
     new LodashModuleReplacementPlugin({
       paths: true,
       flattening: true,
+      shorthands: true,
+      collections: true,
     }),
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify(DEV ? 'development' : 'production'),
@@ -126,6 +128,11 @@ export default {
   ].filter(Boolean),
   module: {
     rules: [{
+      test: /node_modules[\/\\](iconv-lite)[\/\\].+/,
+      resolve: {
+        aliasFields: ['main'],
+      },
+    }, {
       test: /\.mjs$/,
       include: /node_modules/,
       type: 'javascript/auto',
@@ -137,13 +144,19 @@ export default {
         options: babelQuery,
       }],
     }, {
+      test: /\.css$/i,
+      use: ['style-loader', 'css-loader'],
+    }, {
       test: /\.(woff|woff2?|ttf|eot)$/,
-      use: [{
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
+      type: 'asset',
+      parser: {
+        dataUrlCondition: {
+          maxSize: 10000,
         },
-      }],
+      },
+      generator: {
+        filename: '[name]-[contenthash:8][ext]',
+      },
     }, {
       test: /\.svg$/,
       use: ['@svgr/webpack', 'url-loader'],
